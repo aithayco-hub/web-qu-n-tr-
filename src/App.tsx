@@ -313,7 +313,13 @@ export default function App() {
             contactsList={contactsList}
             awardsList={awardsList}
             scheduleList={scheduleList}
+            metadata={metadata}
             onNavigate={setCurrentScreen}
+            onQuickAttendance={(records) => {
+              const today = getTodayDateString();
+              handleSaveAttendance(today, records);
+              showToast('Đã lưu điểm danh hôm nay thành công!', 'success');
+            }}
           />
         )}
 

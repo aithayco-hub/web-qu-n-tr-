@@ -76,7 +76,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-blue-100 shadow-xs">
+    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-amber-100 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-2">
           {/* Left: App Title & Icon */}
@@ -86,14 +86,14 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="flex items-center gap-2.5 text-left group transition-transform active:scale-95"
               title="Về Trang chủ"
             >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:shadow-blue-500/30 transition-all">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-amber-600 to-yellow-600 flex items-center justify-center text-white shadow-md shadow-amber-500/25 group-hover:shadow-amber-500/35 transition-all">
                 <GraduationCap className="w-5 h-5" />
               </div>
               <div className="hidden sm:block">
-                <span className="block text-xs font-semibold uppercase tracking-wider text-blue-600">
+                <span className="block text-xs font-semibold uppercase tracking-wider text-amber-700">
                   Sổ tay điện tử
                 </span>
-                <span className="block text-base font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
+                <span className="block text-base font-bold text-slate-900 group-hover:text-amber-700 transition-colors">
                   Giáo viên chủ nhiệm
                 </span>
               </div>
@@ -107,8 +107,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => onNavigate('home')}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
                 currentScreen === 'home'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
-                  : 'text-slate-600 hover:text-blue-600 hover:bg-blue-50/70'
+                  ? 'bg-amber-600 text-white shadow-xs shadow-amber-600/30'
+                  : 'text-slate-600 hover:text-amber-700 hover:bg-amber-50/70'
               }`}
             >
               <Home className="w-4 h-4" />
@@ -120,8 +120,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => onNavigate('students')}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
                 currentScreen === 'students'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
-                  : 'text-slate-600 hover:text-blue-600 hover:bg-blue-50/70'
+                  ? 'bg-amber-600 text-white shadow-xs shadow-amber-600/30'
+                  : 'text-slate-600 hover:text-amber-700 hover:bg-amber-50/70'
               }`}
             >
               <Users className="w-4 h-4" />
@@ -131,7 +131,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               id="nav-year-config"
               onClick={handleYearConfig}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-slate-600 hover:text-blue-600 hover:bg-blue-50/70 transition-all"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-slate-600 hover:text-amber-700 hover:bg-amber-50/70 transition-all"
               title="Cấu hình năm học & học kỳ"
             >
               <CalendarDays className="w-4 h-4" />
@@ -141,7 +141,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               id="nav-class-info"
               onClick={handleClassInfo}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-slate-600 hover:text-blue-600 hover:bg-blue-50/70 transition-all"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-slate-600 hover:text-amber-700 hover:bg-amber-50/70 transition-all"
               title="Thông tin lớp học 9A2"
             >
               <BookOpen className="w-4 h-4" />
@@ -156,7 +156,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 id="btn-select-year"
                 onClick={() => setYearDropdownOpen(!yearDropdownOpen)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50/80 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-2xs"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50/80 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-2xs"
               >
                 <span>{safeMetadata.academicYear}</span>
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${yearDropdownOpen ? 'rotate-180' : ''}`} />
@@ -174,15 +174,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                         handleUpdate({ academicYear: year });
                         setYearDropdownOpen(false);
                       }}
-                      className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between hover:bg-blue-50 transition-colors ${
+                      className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between hover:bg-amber-50 transition-colors ${
                         safeMetadata.academicYear === year
-                          ? 'text-blue-600 font-bold bg-blue-50/60'
+                          ? 'text-amber-700 font-bold bg-amber-50/60'
                           : 'text-slate-700'
                       }`}
                     >
                       <span>Năm học {year}</span>
                       {safeMetadata.academicYear === year && (
-                        <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                        <span className="w-2 h-2 rounded-full bg-amber-600"></span>
                       )}
                     </button>
                   ))}
@@ -195,7 +195,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 id="btn-teacher-profile"
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-2 p-1.5 sm:px-3 sm:py-1.5 rounded-xl border border-slate-200 hover:border-blue-300 hover:bg-slate-50 transition-all"
+                className="flex items-center gap-2 p-1.5 sm:px-3 sm:py-1.5 rounded-xl border border-slate-200 hover:border-amber-300 hover:bg-slate-50 transition-all"
                 title="Thông tin giáo viên & Tùy chọn"
               >
                 <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
