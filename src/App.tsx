@@ -300,6 +300,7 @@ export default function App() {
             metadata={metadata}
             totalStudents={students.length}
             onOpenStudents={() => setCurrentScreen('students')}
+            onUpdateMetadata={handleSaveMetadata}
           />
         )}
 

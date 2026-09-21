@@ -198,8 +198,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="flex items-center gap-2 p-1.5 sm:px-3 sm:py-1.5 rounded-xl border border-slate-200 hover:border-amber-300 hover:bg-slate-50 transition-all"
                 title="Thông tin giáo viên & Tùy chọn"
               >
-                <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
-                  DTT
+                <div className="w-7 h-7 rounded-lg overflow-hidden bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs shrink-0">
+                  {safeMetadata.teacherAvatar ? (
+                    <img
+                      src={safeMetadata.teacherAvatar}
+                      alt={safeMetadata.teacherName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span>DTT</span>
+                  )}
                 </div>
                 <div className="hidden xl:block text-left">
                   <span className="block text-xs font-bold text-slate-800 leading-none">

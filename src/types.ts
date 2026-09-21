@@ -84,6 +84,8 @@ export interface ClassMetadata {
   teacherName: string;
   headTeacher: string;
   academicYear: string;
+  teacherAvatar?: string;
+  bannerBackground?: string;
 }
 
 export type ActiveScreen = 
