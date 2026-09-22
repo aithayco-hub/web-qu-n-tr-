@@ -10,9 +10,17 @@ import {
   RotateCcw,
   Sparkles,
   Download,
-  Info
+  Info,
+  Database,
+  Camera,
+  Image as ImageIcon,
+  RefreshCw,
+  AlertCircle,
+  CheckCircle2,
+  Check
 } from 'lucide-react';
 import { ActiveScreen, ClassMetadata } from '../types';
+import { compressImage } from '../utils/imageCompressor';
 
 interface NavbarProps {
   currentScreen: ActiveScreen;
@@ -24,6 +32,9 @@ interface NavbarProps {
   onShowYearConfig?: () => void;
   onOpenClassInfo?: () => void;
   onOpenYearConfig?: () => void;
+  onOpenSupabase?: () => void;
+  syncStatus?: 'idle' | 'syncing' | 'synced' | 'error';
+  lastSyncTime?: string;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -36,6 +47,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onShowYearConfig,
   onOpenClassInfo,
   onOpenYearConfig,
+  onOpenSupabase,
+  syncStatus = 'idle',
+  lastSyncTime,
 }) => {
   const safeMetadata: ClassMetadata = metadata || {
     schoolName: 'THCS Phan Bội Châu',
@@ -52,8 +66,12 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const [yearDropdownOpen, setYearDropdownOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [avatarUploadMsg, setAvatarUploadMsg] = useState<string | null>(null);
+
   const yearRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
 
   const availableYears = [
     '2024–2025',
@@ -61,6 +79,34 @@ export const Navbar: React.FC<NavbarProps> = ({
     '2026–2027',
     '2027–2028',
   ];
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      try {
+        const compressed = await compressImage(file, 400, 400, 0.88);
+        handleUpdate({ teacherAvatar: compressed });
+        setAvatarUploadMsg('Đã cập nhật ảnh đại diện');
+        setTimeout(() => setAvatarUploadMsg(null), 2500);
+      } catch (err) {
+        console.error('Lỗi khi nén ảnh đại diện:', err);
+      }
+    }
+  };
+
+  const handleBannerChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      try {
+        const compressed = await compressImage(file, 1600, 700, 0.82);
+        handleUpdate({ bannerBackground: compressed });
+        setAvatarUploadMsg('Đã cập nhật ảnh bìa');
+        setTimeout(() => setAvatarUploadMsg(null), 2500);
+      } catch (err) {
+        console.error('Lỗi khi nén ảnh banner:', err);
+      }
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -151,6 +197,62 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Right: School Year Dropdown & Teacher Info */}
           <div className="flex items-center gap-2">
+            {/* Hidden file inputs for Teacher Avatar & Banner */}
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarChange}
+            />
+            <input
+              ref={bannerInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleBannerChange}
+            />
+
+            {/* Supabase Cloud Sync Quick Button with dynamic status */}
+            {onOpenSupabase && (
+              <button
+                id="btn-nav-supabase-sync"
+                onClick={onOpenSupabase}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-2xs cursor-pointer border ${
+                  syncStatus === 'syncing'
+                    ? 'bg-amber-50 text-amber-800 border-amber-200'
+                    : syncStatus === 'error'
+                    ? 'bg-rose-50 text-rose-800 border-rose-200'
+                    : 'bg-emerald-50/90 hover:bg-emerald-100 border-emerald-200 text-emerald-800'
+                }`}
+                title={
+                  syncStatus === 'syncing'
+                    ? 'Đang tự động lưu lên Supabase Cloud...'
+                    : syncStatus === 'error'
+                    ? 'Có lỗi khi lưu lên Cloud. Bấm để kiểm tra.'
+                    : `Đã lưu trên Supabase Cloud an toàn${lastSyncTime ? ` lúc ${lastSyncTime}` : ''}`
+                }
+              >
+                {syncStatus === 'syncing' ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+                    <span className="hidden sm:inline">Đang lưu...</span>
+                  </>
+                ) : syncStatus === 'error' ? (
+                  <>
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                    <span className="hidden sm:inline">Lỗi Cloud</span>
+                  </>
+                ) : (
+                  <>
+                    <Database className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="hidden sm:inline">Đã lưu Cloud</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  </>
+                )}
+              </button>
+            )}
+
             {/* Year Selector */}
             <div className="relative" ref={yearRef}>
               <button
@@ -195,10 +297,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 id="btn-teacher-profile"
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-2 p-1.5 sm:px-3 sm:py-1.5 rounded-xl border border-slate-200 hover:border-amber-300 hover:bg-slate-50 transition-all"
+                className="flex items-center gap-2 p-1.5 sm:px-3 sm:py-1.5 rounded-xl border border-slate-200 hover:border-amber-300 hover:bg-slate-50 transition-all cursor-pointer"
                 title="Thông tin giáo viên & Tùy chọn"
               >
-                <div className="w-7 h-7 rounded-lg overflow-hidden bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs shrink-0">
+                <div className="w-7 h-7 rounded-lg overflow-hidden bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs shrink-0 border border-amber-300">
                   {safeMetadata.teacherAvatar ? (
                     <img
                       src={safeMetadata.teacherAvatar}
@@ -221,11 +323,76 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
 
               {userMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 z-50 animate-in fade-in zoom-in-95">
-                  <div className="px-3 py-2.5 border-b border-slate-100">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-blue-600">Giáo viên chủ nhiệm</p>
-                    <p className="text-sm font-bold text-slate-900 mt-0.5">{safeMetadata.teacherName}</p>
-                    <p className="text-xs text-slate-500">{safeMetadata.className} • {safeMetadata.schoolName}</p>
+                <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 z-50 animate-in fade-in zoom-in-95">
+                  {/* Teacher Avatar & Header */}
+                  <div className="px-3 py-3 border-b border-slate-100 flex items-center gap-3">
+                    <div className="relative group shrink-0">
+                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-sm shadow-xs border border-amber-200">
+                        {safeMetadata.teacherAvatar ? (
+                          <img
+                            src={safeMetadata.teacherAvatar}
+                            alt={safeMetadata.teacherName}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span>DTT</span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => avatarInputRef.current?.click()}
+                        className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-amber-600 text-white flex items-center justify-center shadow-xs hover:bg-amber-700 transition-colors cursor-pointer"
+                        title="Tải ảnh đại diện mới"
+                      >
+                        <Camera className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Giáo viên chủ nhiệm</p>
+                      <p className="text-sm font-bold text-slate-900 truncate">Thầy {safeMetadata.teacherName}</p>
+                      <p className="text-xs text-slate-500 truncate">{safeMetadata.className} • {safeMetadata.schoolName}</p>
+                    </div>
+                  </div>
+
+                  {avatarUploadMsg && (
+                    <div className="mx-2 mt-2 p-2 bg-emerald-50 text-emerald-800 text-xs font-semibold rounded-lg flex items-center gap-1.5 animate-in fade-in">
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{avatarUploadMsg}</span>
+                    </div>
+                  )}
+
+                  {/* Image upload options */}
+                  <div className="py-1.5 border-b border-slate-100">
+                    <button
+                      onClick={() => {
+                        avatarInputRef.current?.click();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-800 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <Camera className="w-4 h-4 text-amber-600" />
+                      <span>{safeMetadata.teacherAvatar ? 'Thay đổi ảnh đại diện' : 'Tải ảnh đại diện mới'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        bannerInputRef.current?.click();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-800 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <ImageIcon className="w-4 h-4 text-amber-600" />
+                      <span>{safeMetadata.bannerBackground ? 'Thay đổi ảnh bìa' : 'Tải ảnh bìa trang chủ'}</span>
+                    </button>
+
+                    {safeMetadata.teacherAvatar && (
+                      <button
+                        onClick={() => {
+                          handleUpdate({ teacherAvatar: undefined });
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[11px] text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Gỡ ảnh đại diện</span>
+                      </button>
+                    )}
                   </div>
 
                   <div className="py-1">
@@ -234,7 +401,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         handleClassInfo();
                         setUserMenuOpen(false);
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer"
                     >
                       <Info className="w-4 h-4 text-blue-500" />
                       <span>Thông tin lớp học chi tiết</span>
@@ -245,11 +412,29 @@ export const Navbar: React.FC<NavbarProps> = ({
                         handleYearConfig();
                         setUserMenuOpen(false);
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer"
                     >
                       <CalendarDays className="w-4 h-4 text-indigo-500" />
                       <span>Cấu hình học kỳ & phân công</span>
                     </button>
+
+                    {onOpenSupabase && (
+                      <button
+                        onClick={() => {
+                          onOpenSupabase();
+                          setUserMenuOpen(false);
+                        }}
+                        className="w-full flex items-center justify-between px-3 py-2 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Database className="w-4 h-4 text-emerald-600" />
+                          <span>Đồng bộ Supabase Cloud</span>
+                        </div>
+                        {syncStatus === 'synced' && (
+                          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        )}
+                      </button>
+                    )}
                   </div>
 
                   <div className="border-t border-slate-100 pt-1">
@@ -258,7 +443,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         handleReset();
                         setUserMenuOpen(false);
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-amber-700 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
                     >
                       <RotateCcw className="w-4 h-4 text-amber-600" />
                       <span>Đặt lại dữ liệu mẫu lớp 9A2</span>

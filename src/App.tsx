@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ScreenType, Student, ClassMetadata, DailyAttendance, ConductRecord, FinanceRecord, ContactRecord, RewardDisciplineRecord, ScheduleEvent } from './types';
 import {
   getStoredStudents,
@@ -33,7 +33,10 @@ import { AwardsDisciplineView } from './components/AwardsDisciplineView';
 import { ScheduleView } from './components/ScheduleView';
 import { YearConfigModal } from './components/YearConfigModal';
 import { ClassInfoModal } from './components/ClassInfoModal';
+import { SupabaseSyncModal } from './components/SupabaseSyncModal';
 import { Toast, ToastMessage } from './components/Toast';
+import { AppState } from './utils/storage';
+import { fetchAppStateFromSupabase, uploadAppStateToSupabase } from './lib/supabase';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenType>('home');
@@ -48,9 +51,16 @@ export default function App() {
   const [scheduleList, setScheduleList] = useState<ScheduleEvent[]>(() => getStoredSchedule());
   const [metadata, setMetadata] = useState<ClassMetadata>(() => getStoredMetadata());
 
+  // Cloud Sync Status
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
+  const [lastSyncTime, setLastSyncTime] = useState<string>(() => localStorage.getItem('GVCN_LAST_SUPABASE_SYNC') || '');
+  const isInitialMounted = useRef(false);
+  const autoSyncTimeout = useRef<NodeJS.Timeout | null>(null);
+
   // UI Modals & Toasts
   const [isYearConfigOpen, setIsYearConfigOpen] = useState(false);
   const [isClassInfoOpen, setIsClassInfoOpen] = useState(false);
+  const [isSupabaseOpen, setIsSupabaseOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -66,6 +76,112 @@ export default function App() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentScreen]);
+
+  // Khởi động: Kiểm tra và đồng bộ hai chiều với Supabase
+  useEffect(() => {
+    let isMounted = true;
+
+    async function syncOnStart() {
+      setSyncStatus('syncing');
+      try {
+        const res = await fetchAppStateFromSupabase();
+        if (!isMounted) return;
+
+        if (res.success && res.data) {
+          // Trên Supabase đã có dữ liệu -> nạp vào ứng dụng
+          handleRestoreFromSupabase(res.data);
+          setSyncStatus('synced');
+          const now = new Date().toLocaleTimeString('vi-VN');
+          setLastSyncTime(now);
+          localStorage.setItem('GVCN_LAST_SUPABASE_SYNC', now);
+        } else {
+          // Trên Supabase chưa có dữ liệu -> tự động đẩy dữ liệu hiện tại lên
+          const currentState: AppState = {
+            metadata,
+            students,
+            attendance: attendanceRecords,
+            conduct: conductList,
+            finance: financeList,
+            contacts: contactsList,
+            awards: awardsList,
+            schedule: scheduleList,
+          };
+          const upRes = await uploadAppStateToSupabase(currentState);
+          if (!isMounted) return;
+          if (upRes.success) {
+            setSyncStatus('synced');
+            const now = new Date().toLocaleTimeString('vi-VN');
+            setLastSyncTime(now);
+            localStorage.setItem('GVCN_LAST_SUPABASE_SYNC', now);
+            showToast('Đã tự động lưu trữ dữ liệu lớp học lên Supabase Cloud thành công!', 'success');
+          } else {
+            setSyncStatus('idle');
+          }
+        }
+      } catch (e) {
+        console.warn('Lỗi kiểm tra Supabase khi khởi động:', e);
+        if (isMounted) setSyncStatus('idle');
+      }
+    }
+
+    syncOnStart();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Tự động lưu ngầm lên Supabase (Debounced 1.2s) mỗi khi có bất kỳ thay đổi nào
+  useEffect(() => {
+    if (!isInitialMounted.current) {
+      isInitialMounted.current = true;
+      return;
+    }
+
+    if (autoSyncTimeout.current) {
+      clearTimeout(autoSyncTimeout.current);
+    }
+
+    setSyncStatus('syncing');
+
+    autoSyncTimeout.current = setTimeout(async () => {
+      const currentState: AppState = {
+        metadata,
+        students,
+        attendance: attendanceRecords,
+        conduct: conductList,
+        finance: financeList,
+        contacts: contactsList,
+        awards: awardsList,
+        schedule: scheduleList,
+      };
+
+      const res = await uploadAppStateToSupabase(currentState);
+      if (res.success) {
+        setSyncStatus('synced');
+        const now = new Date().toLocaleTimeString('vi-VN');
+        setLastSyncTime(now);
+        localStorage.setItem('GVCN_LAST_SUPABASE_SYNC', now);
+      } else {
+        setSyncStatus('error');
+      }
+    }, 1200);
+
+    return () => {
+      if (autoSyncTimeout.current) {
+        clearTimeout(autoSyncTimeout.current);
+      }
+    };
+  }, [
+    students,
+    attendanceRecords,
+    conductList,
+    financeList,
+    contactsList,
+    awardsList,
+    scheduleList,
+    metadata,
+  ]);
 
   // --- Student Handlers ---
   const handleAddStudent = (newS: Omit<Student, 'id' | 'orderNumber'>) => {
@@ -261,6 +377,41 @@ export default function App() {
     setStoredMetadata(updated);
   };
 
+  const handleRestoreFromSupabase = (newState: AppState) => {
+    if (newState.students && Array.isArray(newState.students)) {
+      setStudents(newState.students);
+      setStoredStudents(newState.students);
+    }
+    if (newState.attendance) {
+      setAttendanceRecords(newState.attendance);
+      setStoredAttendance(newState.attendance);
+    }
+    if (newState.conduct && Array.isArray(newState.conduct)) {
+      setConductList(newState.conduct);
+      setStoredConduct(newState.conduct);
+    }
+    if (newState.finance && Array.isArray(newState.finance)) {
+      setFinanceList(newState.finance);
+      setStoredFinance(newState.finance);
+    }
+    if (newState.contacts && Array.isArray(newState.contacts)) {
+      setContactsList(newState.contacts);
+      setStoredContacts(newState.contacts);
+    }
+    if (newState.awards && Array.isArray(newState.awards)) {
+      setAwardsList(newState.awards);
+      setStoredAwards(newState.awards);
+    }
+    if (newState.schedule && Array.isArray(newState.schedule)) {
+      setScheduleList(newState.schedule);
+      setStoredSchedule(newState.schedule);
+    }
+    if (newState.metadata) {
+      setMetadata(newState.metadata);
+      setStoredMetadata(newState.metadata);
+    }
+  };
+
   const handleResetSampleData = () => {
     if (window.confirm('Khôi phục dữ liệu mẫu ban đầu của Lớp 9A2 (Trường THCS Phan Bội Châu)? Dữ liệu mẫu sẽ được nạp lại.')) {
       resetToSampleData();
@@ -290,6 +441,9 @@ export default function App() {
         onResetData={handleResetSampleData}
         onOpenYearConfig={() => setIsYearConfigOpen(true)}
         onOpenClassInfo={() => setIsClassInfoOpen(true)}
+        onOpenSupabase={() => setIsSupabaseOpen(true)}
+        syncStatus={syncStatus}
+        lastSyncTime={lastSyncTime}
       />
 
       {/* Main Container */}
@@ -432,6 +586,13 @@ export default function App() {
               Nạp lại dữ liệu mẫu
             </button>
             <span>•</span>
+            <button
+              onClick={() => setIsSupabaseOpen(true)}
+              className="text-emerald-600 hover:text-emerald-700 font-medium transition-colors hover:underline cursor-pointer flex items-center gap-1"
+            >
+              <span>Đồng bộ Supabase Cloud</span>
+            </button>
+            <span>•</span>
             <span className="text-slate-400">Lưu trữ cục bộ LocalStorage</span>
           </div>
         </div>
@@ -451,6 +612,23 @@ export default function App() {
         students={students}
         isOpen={isClassInfoOpen}
         onClose={() => setIsClassInfoOpen(false)}
+      />
+
+      <SupabaseSyncModal
+        isOpen={isSupabaseOpen}
+        onClose={() => setIsSupabaseOpen(false)}
+        currentState={{
+          metadata,
+          students,
+          attendance: attendanceRecords,
+          conduct: conductList,
+          finance: financeList,
+          contacts: contactsList,
+          awards: awardsList,
+          schedule: scheduleList,
+        }}
+        onRestoreState={handleRestoreFromSupabase}
+        showToast={showToast}
       />
     </div>
   );

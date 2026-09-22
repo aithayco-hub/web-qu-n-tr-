@@ -296,7 +296,8 @@ export async function testSupabaseConnection(): Promise<{
 }
 
 /**
- * Lưu toàn bộ trạng thái vào bảng classroom_state trên Supabase
+ * Lưu toàn bộ trạng thái vào bảng classroom_state trên Supabase,
+ * đồng thời đồng bộ metadata và danh sách học sinh vào các bảng riêng để tra cứu
  */
 export async function uploadAppStateToSupabase(state: AppState): Promise<{ success: boolean; error?: string }> {
   try {
@@ -306,10 +307,51 @@ export async function uploadAppStateToSupabase(state: AppState): Promise<{ succe
       updated_at: new Date().toISOString(),
     };
 
-    const { error } = await supabase.from('classroom_state').upsert(payload);
+    // 1. Lưu snapshot toàn diện vào classroom_state
+    const { error: stateError } = await supabase.from('classroom_state').upsert(payload);
 
-    if (error) {
-      return { success: false, error: error.message };
+    if (stateError) {
+      return { success: false, error: stateError.message };
+    }
+
+    // 2. Đồng thời cập nhật bảng class_metadata (để lưu thông tin GVCN, ảnh đại diện, ảnh bìa độc lập)
+    try {
+      const meta = state.metadata || ({} as Partial<ClassMetadata>);
+      await supabase.from('class_metadata').upsert({
+        id: 'primary',
+        school_name: meta.schoolName || 'THCS Phan Bội Châu',
+        class_name: meta.className || 'Lớp 9A2',
+        teacher_name: meta.teacherName || 'Dương Thành Tín',
+        head_teacher: meta.headTeacher || 'Dương Thành Tín',
+        academic_year: meta.academicYear || '2026–2027',
+        teacher_avatar: meta.teacherAvatar || null,
+        banner_background: meta.bannerBackground || null,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (metaErr) {
+      console.warn('Lỗi phụ khi cập nhật class_metadata (không ảnh hưởng chính):', metaErr);
+    }
+
+    // 3. Đồng thời cập nhật danh sách học sinh vào bảng students nếu có
+    if (state.students && state.students.length > 0) {
+      try {
+        const studentRows = state.students.map((s) => ({
+          id: s.id,
+          order_number: s.orderNumber,
+          full_name: s.fullName,
+          gender: s.gender,
+          dob: s.dob,
+          parent_phone: s.parentPhone || '',
+          parent_name: s.parentName || '',
+          role: s.role || 'Thành viên',
+          group_number: s.groupNumber || 1,
+          address: s.address || '',
+          notes: s.notes || '',
+        }));
+        await supabase.from('students').upsert(studentRows);
+      } catch (stuErr) {
+        console.warn('Lỗi phụ khi cập nhật bảng students (không ảnh hưởng chính):', stuErr);
+      }
     }
 
     return { success: true };

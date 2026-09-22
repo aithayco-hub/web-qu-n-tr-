@@ -10,9 +10,11 @@ import {
   Camera,
   Upload,
   RotateCcw,
-  Check
+  Check,
+  UserCircle
 } from 'lucide-react';
 import { ClassMetadata } from '../types';
+import { compressImage } from '../utils/imageCompressor';
 
 interface ClassHeaderProps {
   metadata?: ClassMetadata;
@@ -28,8 +30,9 @@ export const ClassHeader: React.FC<ClassHeaderProps> = ({
   onUpdateMetadata,
 }) => {
   const bannerInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [uploadSuccessMessage, setUploadSuccessMessage] = useState<string | null>(null);
 
   const safeMetadata: ClassMetadata = {
     schoolName: metadata?.schoolName || 'THCS Phan Bội Châu',
@@ -41,29 +44,47 @@ export const ClassHeader: React.FC<ClassHeaderProps> = ({
     bannerBackground: metadata?.bannerBackground,
   };
 
-  const handleFileUpload = (file: File) => {
+  const handleBannerUpload = async (file: File) => {
     if (!file || !file.type.startsWith('image/')) {
       alert('Vui lòng chọn file hình ảnh (PNG, JPG, WEBP).');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64Data = e.target?.result as string;
-      if (base64Data && onUpdateMetadata) {
-        onUpdateMetadata({ bannerBackground: base64Data });
-        setUploadSuccess(true);
-        setTimeout(() => setUploadSuccess(false), 2500);
+    try {
+      const compressed = await compressImage(file, 1600, 700, 0.82);
+      if (compressed && onUpdateMetadata) {
+        onUpdateMetadata({ bannerBackground: compressed });
+        setUploadSuccessMessage('Đã cập nhật ảnh bìa mới');
+        setTimeout(() => setUploadSuccessMessage(null), 2500);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Lỗi khi nén ảnh banner:', err);
+    }
+  };
+
+  const handleAvatarUpload = async (file: File) => {
+    if (!file || !file.type.startsWith('image/')) {
+      alert('Vui lòng chọn file hình ảnh (PNG, JPG, WEBP).');
+      return;
+    }
+
+    try {
+      const compressed = await compressImage(file, 400, 400, 0.88);
+      if (compressed && onUpdateMetadata) {
+        onUpdateMetadata({ teacherAvatar: compressed });
+        setUploadSuccessMessage('Đã cập nhật ảnh đại diện GVCN');
+        setTimeout(() => setUploadSuccessMessage(null), 2500);
+      }
+    } catch (err) {
+      console.error('Lỗi khi nén ảnh đại diện:', err);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFileUpload(e.dataTransfer.files[0]);
+      handleBannerUpload(e.dataTransfer.files[0]);
     }
   };
 
@@ -113,7 +134,20 @@ export const ClassHeader: React.FC<ClassHeaderProps> = ({
         className="hidden"
         onChange={(e) => {
           if (e.target.files && e.target.files[0]) {
-            handleFileUpload(e.target.files[0]);
+            handleBannerUpload(e.target.files[0]);
+          }
+        }}
+      />
+
+      {/* Hidden File Input for Teacher Avatar */}
+      <input
+        ref={avatarInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files && e.target.files[0]) {
+            handleAvatarUpload(e.target.files[0]);
           }
         }}
       />
@@ -140,7 +174,7 @@ export const ClassHeader: React.FC<ClassHeaderProps> = ({
       )}
 
       {/* Subtle Discreet Controls: Hidden by default, gently appears only on hover in top-right */}
-      <div className="absolute top-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 bg-black/40 hover:bg-black/60 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-white/20 text-xs shadow-lg">
+      <div className="absolute top-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-2 bg-black/50 hover:bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 text-xs shadow-lg">
         <button
           id="btn-subtle-change-banner"
           onClick={() => bannerInputRef.current?.click()}
@@ -149,6 +183,18 @@ export const ClassHeader: React.FC<ClassHeaderProps> = ({
         >
           <Camera className="w-3.5 h-3.5 text-yellow-300" />
           <span>{hasCustomBanner ? 'Đổi ảnh bìa' : 'Tải ảnh bìa'}</span>
+        </button>
+
+        <span className="text-white/30">•</span>
+
+        <button
+          id="btn-subtle-change-avatar"
+          onClick={() => avatarInputRef.current?.click()}
+          className="flex items-center gap-1.5 text-white/90 hover:text-emerald-300 font-medium transition-colors cursor-pointer"
+          title="Tải ảnh đại diện giáo viên"
+        >
+          <UserCircle className="w-3.5 h-3.5 text-emerald-300" />
+          <span>Đổi ảnh đại diện</span>
         </button>
 
         {hasCustomBanner && (
@@ -168,10 +214,10 @@ export const ClassHeader: React.FC<ClassHeaderProps> = ({
       </div>
 
       {/* Quick success toast pill */}
-      {uploadSuccess && (
+      {uploadSuccessMessage && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-emerald-600/90 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-lg flex items-center gap-1.5 animate-in fade-in zoom-in-95">
           <Check className="w-3.5 h-3.5" />
-          <span>Đã cập nhật ảnh bìa mới</span>
+          <span>{uploadSuccessMessage}</span>
         </div>
       )}
 
@@ -200,9 +246,22 @@ export const ClassHeader: React.FC<ClassHeaderProps> = ({
             <span>{safeMetadata.schoolName}</span>
           </div>
 
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/20 backdrop-blur-md border border-white/20 text-white font-medium">
-            <User className="w-3.5 h-3.5 text-amber-200" />
+          <div
+            onClick={() => avatarInputRef.current?.click()}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/20 hover:bg-black/35 backdrop-blur-md border border-white/20 text-white font-medium cursor-pointer transition-colors"
+            title="Bấm để đổi ảnh đại diện GVCN"
+          >
+            {safeMetadata.teacherAvatar ? (
+              <img
+                src={safeMetadata.teacherAvatar}
+                alt={safeMetadata.teacherName}
+                className="w-5 h-5 rounded-full object-cover border border-amber-300 shadow-xs"
+              />
+            ) : (
+              <User className="w-3.5 h-3.5 text-amber-200" />
+            )}
             <span>GVCN: <strong>{safeMetadata.teacherName}</strong></span>
+            <Camera className="w-3 h-3 text-amber-200/70 hover:text-white" />
           </div>
 
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/20 backdrop-blur-md border border-white/20 text-yellow-200 font-medium">
